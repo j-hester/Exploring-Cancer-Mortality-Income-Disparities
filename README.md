@@ -1,10 +1,10 @@
-Income and Breast Cancer Mortality Rates by NJ Counties (1990–2020)
+# Income and Breast Cancer Mortality Rates by NJ Counties (1990–2020)
 
-Author: Jaquelyn Hester
+# Author: Jaquelyn Hester
 
 This project investigates the potential relationship between income and cancer mortality rates across New Jersey counties from 1990 to 2020.
 
-Introduction
+# Introduction
 
 Cancer is a devastating disease that affects many people. This project examines whether income per capita correlates with cancer mortality rates across New Jersey counties.
 Data Sources
