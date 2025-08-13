@@ -1,0 +1,29 @@
+Cancer Mortality Rates by County in New Jersey
+"All Sites, 2009"
+County,Population at Risk,Deaths,Crude Rate,Age-adjusted Rate,95% Confidence Interval-Lower Limit,95% Confidence Interval-Upper Limit
+Salem,66183,183,276.5,226.2,194.0,262.4
+Cape May,97238,315,323.9,199.3,177.6,223.5
+Gloucester,287362,567,197.3,191.4,175.7,208.0
+Atlantic,274049,593,216.4,188.4,173.4,204.4
+Camden,513668,1037,201.9,186.3,175.0,198.2
+Cumberland,156531,302,192.9,185.4,164.9,207.8
+Sussex,149487,275,184.0,182.8,161.1,206.6
+Monmouth,628669,1311,208.5,180.3,170.5,190.6
+Burlington,447391,918,205.2,179.2,167.6,191.3
+Ocean,573123,1592,277.8,176.9,168.0,186.2
+Warren,108693,222,204.2,176.7,153.9,202.1
+Middlesex,805204,1396,173.4,167.1,158.3,176.1
+Passaic,498641,823,165.1,163.9,152.7,175.6
+Mercer,365388,635,173.8,162.9,150.3,176.3
+Essex,781943,1242,158.8,161.4,152.5,170.8
+Somerset,321564,549,170.7,161.1,147.7,175.5
+Hudson,628572,879,139.8,158.5,148.1,169.4
+Morris,490779,875,178.3,156.8,146.4,167.7
+Bergen,900319,1755,194.9,154.2,146.9,161.7
+Hunterdon,128364,206,160.5,151.0,130.5,173.8
+Union,532434,865,162.5,150.8,140.7,161.3
+STATE,8755602,16540,188.9,168.8, 166.2,171.4
+
+"Note: All rates are per 100,000. Rates are age-adjusted to the 2000 U.S. Standard Million Population."
+"Rates generated on May 5, 2023."
+"Mortality data provided by Center for Health Statistics, NJDOH."

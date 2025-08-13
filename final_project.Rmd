@@ -1,0 +1,366 @@
+---
+title: "Final Project: Income and Breast Cancer Mortality Rates by NJ Counties from 1990-2020"
+author: Jaquelyn Hester
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(here)
+library(flextable)
+library(maps)
+library(gganimate)
+library(magick)
+library(animation)
+library(gganimate)
+library(gifski)
+library(htmltools)
+library(ggrepel)
+library(plotly)
+library(gridExtra)
+```
+
+## Introduction
+CANCER. It's a horrible disease and unfortunately most people know someone who has gone through it. My mom was diagnosed with breast cancer during my freshman year of college. Luckily, her doctors caught it early and now 4 years later she's cancer free. However, it's important to acknowledge that my family was blessed with the time, money, and resources to give my mom the best fighting chance. Due to this experience, I wanted to investigate the potential relationship between income and the mortality rates from cancer.
+
+## Cancer Mortality Rates Dataset
+My first data set contains crude cancer mortality rates by New Jersey counties. This data set was sourced from the New Jersey State Cancer Registry: https://www.cancer-rates.info/nj/
+
+Formula for crude cancer mortality rate: `crude cancer mortality rate = (deaths from cancer / population) * 100,000`
+
+The data was delivered in a folder which contained a separate `.csv` file for each year from 1990 to 2020. I first had to create a function that read through each `.csv` file and combined that data into a singular data frame. Additionally when reading in the `.csv` file, I had to isolate the rows with relevant information (getting rid of the notes) and add a column with the `Year` which was only in the `.csv` file name. 
+
+Now that I have my base data frame containing crude cancer mortality rates, I must go through the process of cleaning it up. I've done this by selecting relevant variables, giving the variables more intuitive names, and converting `Year` from a character variable to a numeric variable.
+
+```{r cancer mortality rates, echo=FALSE, warning=FALSE, message=FALSE}
+
+read_csv_files <- function() {
+  csv_files <- list.files("cancer_data", pattern = "\\.csv$", full.names = TRUE)
+
+  combined_df <- data.frame()
+
+  for (i in csv_files) {
+    df <- read_csv(i, skip = 2) |>
+      slice(1:21) |>
+      mutate(Year = str_extract(i, "\\d+")) |>
+      arrange(County)
+    
+    combined_df <- rbind(combined_df, df)
+  }
+
+  return(combined_df)
+}
+
+cancer <- read_csv_files()
+
+# cancer
+# crude mortality rate = (deaths / pop) * 100,000
+
+clean_cancer <- cancer |>
+  rename(`Crude Mortality Rate (per 100,000)` = `Crude Rate`) |>
+  select(County, `Population at Risk`, Deaths, `Crude Mortality Rate (per 100,000)`, Year) |>
+    mutate(Year = as.numeric(Year))
+
+clean_cancer
+```
+
+Now lets plot the data! As you can see all counties tend to have an overall relatively steady or downward trend in crude  mortality rates over time.
+
+```{r cancer mortality rates plot, echo=FALSE, warning=FALSE, message=FALSE}
+clean_cancer|>
+  ggplot(aes(Year, `Crude Mortality Rate (per 100,000)`)) +
+  geom_point(color = "black") +
+  geom_smooth(aes(color = County)) + # regression
+  ggtitle("Trends in Cancer Mortality Rate Over Time by County") +
+  facet_wrap(~County) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+a <- clean_cancer |>
+  group_by(County) |>
+  summarise(m = mean(`Crude Mortality Rate (per 100,000)`)) |>
+  arrange(m)
+
+b <- head(a) |>
+  select(County) |>
+  flextable() |>
+  set_caption("Top 5 Counties with the LOWEST Cancer Mortality Rates") |>
+  width(width = 2.5)
+
+c <- tail(a) |>
+  select(County) |>
+  flextable() |>
+  set_caption("Top 5 Counties with the HIGHEST Cancer Mortality Rates") |>
+  width(width = 2.5)
+```
+
+## Income Dataset
+My second data set contains income per capita by New Jersey counties. This data set was sourced from the Bureau of Economic Analysis U.S. Department of Commerce: https://apps.bea.gov/regional/downloadzip.cfm
+
+As you can see it's quite messy!
+
+```{r income per capita, echo=FALSE, warning=FALSE, message=FALSE}
+income <- read_csv("CAINC1_NJ_1969_2021.csv")
+
+income
+```
+
+To clean this up I started by using `slice` to get rows that contained information about counties, and `str_extract` to create the `County` variable.
+
+As you can see `LineCode` corresponds to a `Description`:
+
+  `1` = `Personal income (thousands of dollars)`
+  
+  `2` = `Population (persons)` 
+  
+  `3` = `Per capita personal income (dollars)`
+  
+I'm really only interested in the values for `LineCode = 3` or `Per capita personal income (dollars)`. The way I extracted that data was by using a combination of `pivot_longer` followed by `pivot_wider` to make the `Year` and `Income per capita (dollars)` variables. 
+
+```{r clean income, echo=FALSE, warning=FALSE, message=FALSE}
+clean_income <- income  |>
+  slice(4:66) |>
+  mutate(County = str_extract(GeoName, "^.*(?=,)")) |>
+  select(County, LineCode, `1990`: `2020`) |>
+  pivot_longer(cols = `1990`:`2020`,
+               names_to = "Year",
+               values_to = "temp") |>
+  pivot_wider(names_from = LineCode,
+              values_from = temp) |>
+  group_by(County, Year) |>
+  summarise(`1` = sum(`1`, na.rm = TRUE),
+            `2` = sum(`2`, na.rm = TRUE),
+            `Income per capita (dollars)` = sum(`3`, na.rm = TRUE)) |>
+  select(-c(`1`, `2`)) |>
+  arrange(Year) |>
+  mutate(Year = as.numeric(Year))
+
+clean_income
+```
+
+Now lets plot the clean income data! 
+
+```{r income per capita plot, echo=FALSE, warning=FALSE, message=FALSE}
+ggplotly(clean_income|>
+  ggplot(aes(Year, `Income per capita (dollars)`, color = County)) +
+  geom_point() +
+  geom_line() +
+  ggtitle("Income per capita Over Time by County"))
+```
+
+## Is there a relationship between income and the mortality rates from cancer?
+I used `full_join` to create a complete data set that contains 4 variables: `County`, `Crude Mortality Rate (per 100,000)`, `Year`, and `Income per capita (dollars)`
+
+```{r combine, echo=FALSE, warning=FALSE, message=FALSE}
+full_data <- clean_cancer |>
+  full_join(clean_income) |>
+  select(-c(`Population at Risk`, Deaths))
+
+full_data 
+```
+
+So far wrangling the data has been pretty manageable but once I got to this next part I basically stared blankly at my screen and cried for a week and a half. My initial problem was that I couldn't figure out how I wanted to show these 4 variables. I eventually settled on an animated scatter plot with `Income per capita (dollars)` on the x-axis and `Crude Mortality Rate (per 100,000)` on the y-axis where the scatter plot points were colored by `County` and the animation frames are by `Year`. My biggest problem happened at the `animate()` step. I kept getting a bunch of separate images for each year instead of a combined animation. This part honestly contributed to most of the crying but I eventually figured out that I needed to add a rendering argument `renderer = gifski_renderer()` to the `animate()` function in order to combine all of those separate images I was getting into a singular animation. I'm dead serious when I tell you that I cried actual tears of joy when I got my animation to work.
+
+#### High Income, Low Mortality Rate
+
+```{r extreme 1 (rich no die), echo=FALSE, warning=FALSE, message=FALSE}
+low_mortality <- full_data |> # week 11 material
+  group_by(Year) |>
+  slice_min(`Crude Mortality Rate (per 100,000)`, n = 6)
+
+high_income <- full_data |> # week 11 material
+  group_by(Year) |>
+  slice_max(`Income per capita (dollars)`, n = 6)
+
+extreme1 <- inner_join(low_mortality, high_income)
+#Joining with `by = join_by(County, `Population at Risk`, `Crude Mortality Rate (per 100,000)`, Year, `Income per capita (dollars)`)`
+```
+
+Looking at this graph, we can visually see that Hunterdon, Morris, and Somerset counties consistently have high income per capita and low mortality rates over the span of 31 years from 1990 to 2020. 
+
+The resolution of the animation isn't the best but after spending half a day trying to fix it I eventually gave up.
+
+```{r extreme 1 (rich no die) plot, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+# basic plot
+p1 <- full_data |>
+  mutate(Year = as.factor(Year)) |>
+  ggplot(aes(`Income per capita (dollars)`, `Crude Mortality Rate (per 100,000)`, color = County)) +
+  geom_point() +
+  geom_text_repel(data = extreme1, aes(label = County)) + # week 11 assignment
+  theme_classic()
+
+# animation
+a1 <- p1 + 
+  transition_states(Year) + 
+  labs(title = "Year: {closest_state}") +
+  enter_fade() + 
+  exit_fade()
+
+# combine all of those Year images into a video (gif)
+gif1 <- animate(a1, renderer = gifski_renderer())
+
+# lets you see it in the html output of the RMarkdown instead of in the viewer 
+htmltools::img(src = gif1, width = "800", height = "600", res = "500")
+```
+
+To confirm the observation in the graph above, the commonality between the 3 charts below are Hunterdon, Morris, and Somerset counties.
+
+Another thing that gave me problems, I tried to put all of the flextables side by side since that would be more visually appealing but after spending the other half of a day trying to fix it I eventually gave up.
+
+```{r extreme 1 (rich no die) charts, echo=FALSE, warning=FALSE, message=FALSE}
+table(extreme1$County) |>
+  as.data.frame() |>
+  rename(County = Var1, Count = Freq) |>
+  flextable() |>
+  set_caption("Counties with High Income per capita and Low Crude Mortality Rate from 1990 to 2020") |>
+  width(width = 1.5)
+
+clean_cancer |>
+  group_by(County) |>
+  summarise(m = mean(`Crude Mortality Rate (per 100,000)`)) |>
+  arrange(m) |> # smallest to largest
+  head() |>
+  select(County) |>
+  arrange(County) |> # make it alphabetical
+  flextable() |>
+  set_caption("Top 6 Counties with the LOWEST Average Cancer Mortality Rates from 1990 to 2020") |>
+  width(width = 2.5)
+
+clean_income |>
+  group_by(County) |>
+  summarise(m = mean(`Income per capita (dollars)`)) |>
+  arrange(m) |> # smallest to largest
+  tail() |>
+  select(County) |>
+  arrange(County) |> # make it alphabetical
+  flextable() |>
+  set_caption("Top 6 Counties with the HIGHEST Average Income per captia from 1990 to 2020") |>
+  width(width = 2.5)
+```
+
+
+#### Low Income, High Mortality Rate
+```{r extreme 2 (poor die), echo=FALSE, warning=FALSE, message=FALSE}
+high_mortality <- full_data |> # week 11 material
+  group_by(Year) |>
+  slice_max(`Crude Mortality Rate (per 100,000)`, n = 6)
+
+low_income <- full_data |> # week 11 material
+  group_by(Year) |>
+  slice_min(`Income per capita (dollars)`, n = 6)
+
+extreme2 <- inner_join(high_mortality, low_income)
+#Joining with `by = join_by(County, `Population at Risk`, `Crude Mortality Rate (per 100,000)`, Year, `Income per capita (dollars)`)`
+```
+
+Looking at this graph, we can most obviously see that Salem county had low income per captia and high mortality rates over the span of 31 years from 1990 to 2020. 
+
+```{r extreme 2 (poor die) plot, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+# basic plot
+p2 <- full_data |>
+  mutate(Year = as.factor(Year)) |>
+  ggplot(aes(`Income per capita (dollars)`, `Crude Mortality Rate (per 100,000)`, color = County)) +
+  geom_point() +
+  geom_text_repel(data = extreme2, aes(label = County)) + # week 11 assignment
+  theme_classic()
+
+# animation
+a2 <- p2 + transition_states(Year) + labs(title = "Year: {closest_state}") +
+  enter_fade() + exit_fade()
+
+# combine all of those Year images into a video (gif)
+gif2 <- animate(a2, renderer = gifski_renderer())
+
+# lets you see it in the html output of the RMarkdown instead of in the viewer 
+htmltools::img(src = gif2, width = "800", height = "600", res = "500")
+```
+
+To confirm the observation regarding Salem county in the animation above, the `Counties with Low Income per capita and High Crude Mortality Rate from 1990 to 2020` chart shows that Salem county consistently had low income per capita and high mortality rates for all 31 years between 1990 and 2020. Additionally we can see that Atlantic, Cumberland, and Ocean counties also consistently had low income per capita and high mortality. These 4 counties are common to all 3 charts below and are visually very noticeable in the animation above.
+
+```{r extreme 2 (poor die) charts, echo=FALSE, warning=FALSE, message=FALSE}
+table(extreme2$County) |>
+  as.data.frame() |>
+  rename(County = Var1, Count = Freq) |>
+  flextable() |>
+  set_caption("Counties with Low Income per capita and High Crude Mortality Rate from 1990 to 2020") |>
+  width(width = 1.5)
+
+clean_cancer |>
+  group_by(County) |>
+  summarise(m = mean(`Crude Mortality Rate (per 100,000)`)) |>
+  arrange(m) |> # smallest to largest
+  tail() |>
+  select(County) |>
+  arrange(County) |> # make it alphabetical
+  flextable() |>
+  set_caption("Top 6 Counties with the HIGHEST Average Cancer Mortality Rates from 1990 to 2020") |>
+  width(width = 2.5)
+
+clean_income |>
+  group_by(County) |>
+  summarise(m = mean(`Income per capita (dollars)`)) |>
+  arrange(m) |> # smallest to largest
+  head() |>
+  select(County) |>
+  arrange(County) |> # make it alphabetical
+  flextable() |>
+  set_caption("Top 6 Counties with the LOWEST Average Income per captia from 1990 to 2020") |>
+  width(width = 2.5)
+```
+
+### Alternative
+#### High Income, High Mortality Rate
+Bergen and Monmouth consistently have had high income per capita and high mortality rates. However this is most prevalent throughout the 90s and steadily tapers off from 2000 to 2011. This could mean that cancer mortality rates dropped in the 2000s due to advancements in medical care, changes in population dynamics, etc.
+```{r extreme 3, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+extreme3 <- inner_join(high_mortality, high_income)
+
+extreme3
+
+p3 <- full_data |>
+  mutate(Year = as.factor(Year)) |>
+  ggplot(aes(`Income per capita (dollars)`, `Crude Mortality Rate (per 100,000)`, color = County)) +
+  geom_point() +
+  geom_text_repel(data = extreme3, aes(label = County)) + # week 11 assignment
+  theme_classic()
+
+# animation
+a3 <- p3 + transition_states(Year) + labs(title = "Year: {closest_state}") +
+  enter_fade() + exit_fade()
+
+# combine all of those Year images into a video (gif)
+gif3 <- animate(a3, renderer = gifski_renderer())
+
+# lets you see it in the html output of the RMarkdown instead of in the viewer 
+htmltools::img(src = gif3, width = "800", height = "600", res = "500")
+```
+#### Low Income, Low Mortality Rate
+Hudson and Passaic consistently have had low income per capita and low mortality rates. This relationship could occur for any number of reasons despite having a financial barrier to top medical care and resources. For example, population demographics such as race and age.
+```{r extreme 4, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+extreme4 <- inner_join(low_mortality, low_income)
+
+extreme4
+
+p4 <- full_data |>
+  mutate(Year = as.factor(Year)) |>
+  ggplot(aes(`Income per capita (dollars)`, `Crude Mortality Rate (per 100,000)`, color = County)) +
+  geom_point() +
+  geom_text_repel(data = extreme4, aes(label = County)) + # week 11 assignment
+  theme_classic()
+
+# animation
+a4 <- p4 + transition_states(Year) + labs(title = "Year: {closest_state}") +
+  enter_fade() + exit_fade()
+
+# combine all of those Year images into a video (gif)
+gif4 <- animate(a4, renderer = gifski_renderer())
+
+# lets you see it in the html output of the RMarkdown instead of in the viewer 
+htmltools::img(src = gif4, width = "800", height = "600", res = "500")
+```
+## Conclusions
+These observations do show some support for my hypothesis that having a higher income decreases your chances of dying from cancer, while unfortunately having a lower income increases your chances of dying from cancer, with some exceptions shown under the `Alternative` heading. This is likely because having money grants access to better medical care, resources, and most likely a plethora of other factors.
+
+
+
+
