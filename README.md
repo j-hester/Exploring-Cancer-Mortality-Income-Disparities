@@ -50,6 +50,7 @@ Visualizations explore the relationship between income and mortality rates:
 
 - High Income, Low Mortality Rate: Hunterdon, Morris, and Somerset counties consistently had high income and low mortality rates.
 - Low Income, High Mortality Rate: Salem, Atlantic, Cumberland, and Ocean counties had low income and high mortality rates.
+
 Alternative Relationships
 - High Income, High Mortality: Bergen and Monmouth (mainly in the 1990s).
 - Low Income, Low Mortality: Hudson and Passaic.
