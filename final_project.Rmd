@@ -21,7 +21,7 @@ library(gridExtra)
 ```
 
 ## Introduction
-CANCER. It's a horrible disease and unfortunately most people know someone who has gone through it. My mom was diagnosed with breast cancer during my freshman year of college. Luckily, her doctors caught it early and now 4 years later she's cancer free. However, it's important to acknowledge that my family was blessed with the time, money, and resources to give my mom the best fighting chance. Due to this experience, I wanted to investigate the potential relationship between income and the mortality rates from cancer.
+CANCER. It's a horrible disease and unfortunately most people know someone who has gone through it. I wanted to investigate the potential relationship between income and the mortality rates from cancer.
 
 ## Cancer Mortality Rates Dataset
 My first data set contains crude cancer mortality rates by New Jersey counties. This data set was sourced from the New Jersey State Cancer Registry: https://www.cancer-rates.info/nj/
